@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1 # O una versión estable más reciente
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - dndms_network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1 # O una versión estable más reciente
+    container_name: kafka
+    ports:
+      # Puerto para que tu máquina host (ej. tu IDE) se conecte a Kafka
+      - "9092:9092"
+      # Puerto para que otros contenedores en la misma red Docker se conecten a Kafka
+      # A veces se usa un puerto diferente como 29092 para esto, pero 9092 puede funcionar si se configura bien KAFKA_ADVERTISED_LISTENERS
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      # KAFKA_ADVERTISED_LISTENERS: Aquí es donde se pone delicado.
+      # - PLAINTEXT://kafka:29092 -> para comunicación interna entre contenedores. 'kafka' es el nombre del servicio.
+      # - PLAINTEXT_HOST://localhost:9092 -> para que tu aplicación fuera de Docker (ej. desde el IDE) se conecte.
+      # Necesitas mapear estos nombres lógicos a protocolos.
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092 
+      # Si PLAINTEXT://kafka:9092 no funciona para inter-container, prueba PLAINTEXT://kafka:29092 y expón "29092:29092"
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1 # Necesario para algunas imágenes de Confluent
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1 # Necesario para algunas imágenes de Confluent
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1             # Necesario para algunas imágenes de Confluent
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1  # Necesario para algunas imágenes de Confluent
+    networks:
+      - dndms_network
+
+  redis:
+    image: redis:6.2-alpine # O una versión estable más reciente
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data # Persistencia para los datos de Redis
+    networks:
+      - dndms_network
+
+  dynamo-local:
+    image: amazon/dynamodb-local:latest # O una versión específica
+    container_name: dynamo-local
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb_data:/home/dynamodblocal/data # Persistencia para los datos de DynamoDB
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data" # -dbPath es relativo al workdir del contenedor
+    networks:
+      - dndms_network
+
+  # --- Ejemplo de cómo añadirías tus microservicios más adelante ---
+  # dndms-ms1-adventure-forge-app:
+  #   # Asume que tienes un Dockerfile en la raíz de este proyecto (dndms-ms1-adventure-forge)
+  #   build: . 
+  #   container_name: dndms-ms1-adventure-forge-app
+  #   ports:
+  #     - "8081:8080" # Mapea el puerto 8080 del contenedor al 8081 de tu host
+  #   depends_on:
+  #     - kafka
+  #     - redis
+  #     - dynamo-local
+  #   environment:
+  #     # Perfil de Spring para configuraciones específicas de Docker
+  #     SPRING_PROFILES_ACTIVE: docker 
+  #     # Configuración para que la aplicación Spring Boot se conecte a Kafka DENTRO de la red Docker
+  #     SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092 
+  #     SPRING_REDIS_HOST: redis
+  #     SPRING_REDIS_PORT: 6379
+  #     # Endpoint para DynamoDB Local dentro de la red Docker
+  #     AWS_DYNAMODB_ENDPOINT: http://dynamo-local:8000 
+  #     AWS_ACCESS_KEY_ID: dummyKeyId # Necesario para el SDK de AWS aunque sea local
+  #     AWS_SECRET_ACCESS_KEY: dummySecretKey # Necesario para el SDK de AWS aunque sea local
+  #     AWS_REGION: us-east-1 # O cualquier región, para el SDK
+  #   networks:
+  #     - dndms_network
+
+volumes:
+  redis_data: # Define el volumen para persistencia de Redis
+  dynamodb_data: # Define el volumen para persistencia de DynamoDB
+
+networks:
+  dndms_network: # Define una red personalizada para tus servicios
+    driver: bridge
