@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.0.1 # O una versión estable más reciente
+    image: confluentinc/cp-zookeeper:7.0.1
     container_name: zookeeper
     ports:
       - "2181:2181"
@@ -13,37 +11,51 @@ services:
       - dndms_network
 
   kafka:
-    image: confluentinc/cp-kafka:7.0.1 # O una versión estable más reciente
+    image: confluentinc/cp-kafka:7.0.1
     container_name: kafka
     ports:
-      # Puerto para que tu máquina host (ej. tu IDE) se conecte a Kafka
+      # Puerto 9092 del contenedor mapeado al 9092 de tu MÁQUINA HOST
+      # Esto es para que tu aplicación MS1 corriendo en el HOST (no como contenedor aún) pueda conectarse.
       - "9092:9092"
-      # Puerto para que otros contenedores en la misma red Docker se conecten a Kafka
-      # A veces se usa un puerto diferente como 29092 para esto, pero 9092 puede funcionar si se configura bien KAFKA_ADVERTISED_LISTENERS
+      # El puerto 29092 NO se expone al host, es solo para comunicación INTERNA entre contenedores.
     depends_on:
       - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      # KAFKA_ADVERTISED_LISTENERS: Aquí es donde se pone delicado.
-      # - PLAINTEXT://kafka:29092 -> para comunicación interna entre contenedores. 'kafka' es el nombre del servicio.
-      # - PLAINTEXT_HOST://localhost:9092 -> para que tu aplicación fuera de Docker (ej. desde el IDE) se conecte.
-      # Necesitas mapear estos nombres lógicos a protocolos.
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092 
-      # Si PLAINTEXT://kafka:9092 no funciona para inter-container, prueba PLAINTEXT://kafka:29092 y expón "29092:29092"
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Define los listeners INTERNOS del broker Kafka dentro de su contenedor:
+      KAFKA_LISTENERS: PLAINTEXT_INTERNAL://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      # Define CÓMO se anuncian estos listeners a los clientes:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_INTERNAL://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      # Mapea los nombres de los listeners a protocolos de seguridad:
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_INTERNAL:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      # Para comunicación entre brokers en un clúster (buena práctica tenerlo aunque sea un solo nodo):
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1 # Necesario para algunas imágenes de Confluent
-      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1 # Necesario para algunas imágenes de Confluent
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1             # Necesario para algunas imágenes de Confluent
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1  # Necesario para algunas imágenes de Confluent
+      # Variables de Confluent para evitar problemas con licencias en versiones de comunidad o desarrollo:
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
     networks:
       - dndms_network
 
+  kafdrop: # Cambia el nombre del servicio para reflejar la imagen
+    image: obsidiandynamics/kafdrop:latest # Esta es una imagen popular y actualizada
+    container_name: kafdrop
+    ports:
+      - "9000:9000" # Kafdrop usualmente corre en el puerto 9000
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092 # 'kafka' es el nombre de tu servicio Kafka en docker-compose
+      # JVM_OPTS: "-Xms32M -Xmx64M" # Opcional: para limitar el uso de memoria
+    depends_on:
+      - kafka
+    networks:
+      - dndms_network   
+
   redis:
-    image: redis:6.2-alpine # O una versión estable más reciente
+    image: redis:6.2-alpine
     container_name: redis
     ports:
       - "6379:6379"
@@ -53,7 +65,7 @@ services:
       - dndms_network
 
   dynamo-local:
-    image: amazon/dynamodb-local:latest # O una versión específica
+    image: amazon/dynamodb-local:latest
     container_name: dynamo-local
     ports:
       - "8000:8000"

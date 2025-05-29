@@ -1,44 +1,125 @@
 # D&D Microservices - MS1: Adventure Forge (`dndms-ms1-adventure-forge`)
 
-## Propósito
-Este microservicio es responsable de generar las misiones o aventuras base del sistema.
-Puede operar en modo manual (recibiendo parámetros) o aleatorio.
+## 🧭 Propósito
+Este microservicio es el punto de partida para la generación de contenido en el sistema "Forjador de Aventuras D&D".  
+Crea "semillas" de aventura y las publica para que otros microservicios actúen sobre ellas.
 
-## Responsabilidades Clave
-- Generar el objeto `AventuraCreadaEvent` con:
-    - `adventureId` (String)
-    - `challengeType` (String)
-    - `environment` (String)
-    - `numEncounters` (int)
-    - `goldRewardTier` (String)
-- Publicar `AventuraCreadaEvent` al bus de eventos.
+## 🧱 Responsabilidades Clave
+- Generar aleatoriamente atributos de una aventura.
+- Construir un objeto `AventuraCreadaEvent` con:
+  - `adventureId` (UUID)
+  - `challengeType` (ej: "investigar", "recuperar", "proteger")
+  - `environment` (ej: "ruina olvidada", "bosque encantado")
+  - `numEncounters` (int)
+  - `goldRewardTier` (ej: "poor", "generous", "treasure")
+- Publicar `AventuraCreadaEvent` a Kafka.
 
-## Tecnologías
-- Java, Spring Boot
-- Spring Kafka (Productor)
-- DTOs compartidos vía Git Submodule (`dndms-event-dtos`)
+## ⚙️ Stack Tecnológico
+- **Lenguaje/Framework:** Java 17, Spring Boot 3.3.0
+- **Dependencias:** Maven
+- **Eventos:** Spring Kafka (Productor)
+- **DTOs Compartidos:** Submódulo Git `dndms-event-dtos`  
+  Paquete: `com.xvclemente.dnd.dtos.events`
+- **Contenerización:** Docker + `docker-compose.yml`  
+  (Dockerfile pendiente)
 
-## Eventos Publicados
-- `AventuraCreadaEvent` (al topic: `aventuras-topic`)
+## 📤 Eventos Publicados
+- **Evento:** `AventuraCreadaEvent`
+  - **Topic Kafka:** `aventuras-topic`
+  - **Clave Kafka:** `adventureId`
+  - **Payload:** detalles de la aventura generada
 
-## Eventos Consumidos
+## 📥 Eventos Consumidos
 - Ninguno
 
-## API Endpoints
-- `POST /api/v1/adventures` (para creación manual)
-- `POST /api/v1/adventures/random` (para creación aleatoria)
-*(Estos se definirán e implementarán más adelante)*
+## 📡 API Endpoints
+- `POST /api/v1/adventures/generate-random`
+  - Genera una aventura aleatoria
+  - Publica evento en Kafka
+  - Devuelve `AventuraCreadaEvent` como respuesta
+- `POST /api/v1/adventures` *(manual, por implementar)*
 
-## Cómo Construir y Ejecutar Localmente
-1. Asegúrate de que los submódulos Git estén inicializados y actualizados:
-   `git submodule init`
-   `git submodule update --remote`
-2. Construye con Maven:
-   `mvn clean package`
-3. Ejecuta la aplicación (requiere Kafka corriendo, ver `docker-compose.yml`):
-   `java -jar target/dndms-ms1-adventure-forge-0.0.1-SNAPSHOT.jar`
-4. O ejecuta usando el perfil de Spring Boot en tu IDE.
+## 🔧 Configuración Local (`application.properties`)
+```properties
+server.port=8081
+spring.kafka.producer.bootstrap-servers=localhost:9092
+app.kafka.topic.aventuras-creadas=aventuras-topic
+```
 
-## Entorno de Desarrollo Local (`docker-compose.yml`)
-Este repositorio contiene el `docker-compose.yml` principal para levantar el entorno de desarrollo local (Kafka, Zookeeper, Redis, etc.).
-Ejecutar con: `docker-compose up -d`
+## 🐳 Entorno de Desarrollo (`docker-compose.yml`)
+Incluye:
+- Zookeeper
+- Kafka
+- Redis
+- DynamoDB Local
+- Kafdrop
+
+**Levantar entorno:**
+```bash
+docker-compose up -d
+```
+
+**Detener entorno:**
+```bash
+docker-compose down
+```
+
+**Kafdrop UI:**  
+http://localhost:9000
+
+## 🛠 Cómo Ejecutar Localmente (MS1)
+
+**1. Clonar con submódulos:**
+```bash
+git clone --recurse-submodules <URL_REPO> dndms-ms1-adventure-forge
+cd dndms-ms1-adventure-forge
+```
+
+**2. Inicializar submódulos:**
+```bash
+git submodule init
+git submodule update --remote shared-dtos-module
+```
+
+**3. Verificar servicios:**
+```bash
+docker-compose ps
+```
+
+**4. Construir app (opcional):**
+```bash
+mvn clean package
+```
+
+**5. Ejecutar MS1:**
+- **Opción A (dev):**
+  ```bash
+  mvn spring-boot:run
+  ```
+- **Opción B (JAR):**
+  ```bash
+  java -jar target/dndms-ms1-adventure-forge-0.0.1-SNAPSHOT.jar
+  ```
+- **Opción C (IDE):**  
+  Ejecuta `Ms1AdventureForgeApplication.java` desde tu IDE.
+
+**6. Probar endpoint:**
+```bash
+curl -X POST http://localhost:8081/api/v1/adventures/generate-random
+```
+
+**7. Verificar en Kafdrop:**  
+http://localhost:9000 → `aventuras-topic` → "View Messages"
+
+## 📌 Próximos Pasos
+- [ ] Implementar `POST /api/v1/adventures`
+- [ ] Añadir variedad a la generación aleatoria
+- [ ] Mejorar validaciones y manejo de errores
+- [ ] Tests unitarios y de integración
+- [ ] Crear `Dockerfile`
+
+## 🤝 Contribución
+Lee `CONTRIBUTING.md` para más detalles.
+
+## 📄 Licencia
+Este proyecto está bajo la Licencia XYZ. Ver `LICENSE.md`.
