@@ -69,9 +69,10 @@ services:
     container_name: dynamo-local
     ports:
       - "8000:8000"
-    volumes:
-      - dynamodb_data:/home/dynamodblocal/data # Persistencia para los datos de DynamoDB
-    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data" # -dbPath es relativo al workdir del contenedor
+    # command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data" 
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    #volumes:
+    #  - dynamodb_data:/home/dynamodblocal/data 
     networks:
       - dndms_network
 
