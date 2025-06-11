@@ -76,31 +76,25 @@ services:
     networks:
       - dndms_network
 
-  # --- Ejemplo de cómo añadirías tus microservicios más adelante ---
-  # dndms-ms1-adventure-forge-app:
-  #   # Asume que tienes un Dockerfile en la raíz de este proyecto (dndms-ms1-adventure-forge)
-  #   build: . 
-  #   container_name: dndms-ms1-adventure-forge-app
-  #   ports:
-  #     - "8081:8080" # Mapea el puerto 8080 del contenedor al 8081 de tu host
-  #   depends_on:
-  #     - kafka
-  #     - redis
-  #     - dynamo-local
-  #   environment:
-  #     # Perfil de Spring para configuraciones específicas de Docker
-  #     SPRING_PROFILES_ACTIVE: docker 
-  #     # Configuración para que la aplicación Spring Boot se conecte a Kafka DENTRO de la red Docker
-  #     SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092 
-  #     SPRING_REDIS_HOST: redis
-  #     SPRING_REDIS_PORT: 6379
-  #     # Endpoint para DynamoDB Local dentro de la red Docker
-  #     AWS_DYNAMODB_ENDPOINT: http://dynamo-local:8000 
-  #     AWS_ACCESS_KEY_ID: dummyKeyId # Necesario para el SDK de AWS aunque sea local
-  #     AWS_SECRET_ACCESS_KEY: dummySecretKey # Necesario para el SDK de AWS aunque sea local
-  #     AWS_REGION: us-east-1 # O cualquier región, para el SDK
-  #   networks:
-  #     - dndms_network
+  # --- AHORA AÑADIMOS NUESTRO MICROSERVICIO ---
+  dndms-ms1-adventure-forge-app:
+    # 'build: .' le dice a Docker Compose que construya una imagen
+    # usando el Dockerfile que se encuentra en el directorio actual.
+    build: .
+    container_name: dndms-ms1-adventure-forge-app
+    ports:
+      - "8081:8081" 
+    depends_on:
+      - kafka
+    environment:
+      # Perfil de Spring para configuraciones específicas de Docker
+      SPRING_PROFILES_ACTIVE: docker 
+      # IMPORTANTE: Ahora que MS1 corre DENTRO de la red Docker, debe conectarse a Kafka
+      # usando el nombre del servicio 'kafka' y el puerto INTERNO 29092
+      # o 'kafka:9092' si usaste la configuración simple para el listener de Kafka.
+      #SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092 
+    networks:
+      - dndms_network
 
 volumes:
   redis_data: # Define el volumen para persistencia de Redis
