@@ -9,6 +9,12 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     networks:
       - dndms_network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 2181 || exit 1"] # Comando para verificar si el puerto 2181 está abierto
+      interval: 10s # Chequear cada 10 segundos
+      timeout: 5s # Dar 5 segundos para que el comando se complete
+      retries: 5 # Intentar 5 veces antes de marcar como "unhealthy"
+      start_period: 30s # Dar 30 segundos para que el servicio inicie antes de empezar a chequear
 
   kafka:
     image: confluentinc/cp-kafka:7.0.1
@@ -19,7 +25,8 @@ services:
       - "9092:9092"
       # El puerto 29092 NO se expone al host, es solo para comunicación INTERNA entre contenedores.
     depends_on:
-      - zookeeper
+      zookeeper: # Modificado para esperar el healthcheck
+        condition: service_healthy # Espera hasta que zookeeper esté marcado como saludable
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
@@ -40,6 +47,12 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
     networks:
       - dndms_network
+    healthcheck: # ¡NUEVA SECCIÓN para KAFKA!
+      test: ["CMD", "sh", "-c", "nc -z localhost 29092 || exit 1"] # Verifica el puerto interno de Kafka
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s # Podría tomar un poco más de tiempo que Zookeeper
 
   kafdrop: # Cambia el nombre del servicio para reflejar la imagen
     image: obsidiandynamics/kafdrop:latest # Esta es una imagen popular y actualizada
@@ -85,7 +98,8 @@ services:
     ports:
       - "8081:8081" 
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy # Asegúrate de que Kafka esté saludable
     environment:
       # Perfil de Spring para configuraciones específicas de Docker
       SPRING_PROFILES_ACTIVE: docker 
@@ -95,6 +109,29 @@ services:
       #SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092 
     networks:
       - dndms_network
+    
+  dndms-ms2-character-roster-app:
+    build:
+      # ¡IMPORTANTE! La ruta al contexto de build es relativa al docker-compose.yml
+      context: ../dndms-ms2-character-roster 
+    container_name: dndms-ms2-character-roster-app
+    ports:
+      # Mapea el puerto 8082 del contenedor al 8082 de tu host
+      - "8082:8082" 
+    depends_on:
+      kafka:
+        condition: service_healthy # Asegúrate de que Kafka esté saludable
+      dynamo-local:
+        condition: service_started # No hay healthcheck para DynamoDB, así que 'service_started' es suficiente
+    environment:
+      # Activa el perfil de Spring 'docker' para que lea application-docker.properties
+      SPRING_PROFILES_ACTIVE: docker
+      AWS_ACCESS_KEY_ID: 'test'
+      AWS_SECRET_ACCESS_KEY: 'test'
+      AWS_REGION: 'us-east-1'
+    networks:
+      - dndms_network
+    mem_limit: 1024m # Asigna 1GB de memoria
 
 volumes:
   redis_data: # Define el volumen para persistencia de Redis
