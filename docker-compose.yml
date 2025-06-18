@@ -47,12 +47,12 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
     networks:
       - dndms_network
-    healthcheck: # ¡NUEVA SECCIÓN para KAFKA!
+    healthcheck:
       test: ["CMD", "sh", "-c", "nc -z localhost 29092 || exit 1"] # Verifica el puerto interno de Kafka
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 40s # Podría tomar un poco más de tiempo que Zookeeper
+      start_period: 50s # Podría tomar un poco más de tiempo que Zookeeper
 
   kafdrop: # Cambia el nombre del servicio para reflejar la imagen
     image: obsidiandynamics/kafdrop:latest # Esta es una imagen popular y actualizada
@@ -78,14 +78,11 @@ services:
       - dndms_network
 
   dynamo-local:
-    image: amazon/dynamodb-local:latest
+    image: amazon/dynamodb-local:2.4.0
     container_name: dynamo-local
     ports:
       - "8000:8000"
-    # command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data" 
-    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
-    #volumes:
-    #  - dynamodb_data:/home/dynamodblocal/data 
+    command: "-jar DynamoDBLocal.jar -sharedDb"          
     networks:
       - dndms_network
 
@@ -131,7 +128,27 @@ services:
       AWS_REGION: 'us-east-1'
     networks:
       - dndms_network
-    mem_limit: 1024m # Asigna 1GB de memoria
+
+  dndms-ms3-combat-arena-app:
+    build:
+      context: ../dndms-ms3-combat-arena
+    container_name: dndms-ms3-combat-arena-app
+    ports:
+      - "8083:8083"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      dynamo-local:
+        condition: service_started
+      dndms-ms2-character-roster-app:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      AWS_ACCESS_KEY_ID: test-key
+      AWS_SECRET_ACCESS_KEY: test-secret
+      AWS_REGION: us-east-1
+    networks:
+      - dndms_network
 
 volumes:
   redis_data: # Define el volumen para persistencia de Redis
