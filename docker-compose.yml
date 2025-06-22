@@ -150,6 +150,26 @@ services:
     networks:
       - dndms_network
 
+  dndms-ms4-hall-of-fame-app:
+    build:
+      context: ../dndms-ms4-hall-of-fame
+    container_name: dndms-ms4-hall-of-fame-app
+    ports:
+      - "8084:8084"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      dynamo-local:
+        condition: service_started
+    environment:
+      # Activamos el perfil 'docker' para que cargue 'application-docker.properties'
+      SPRING_PROFILES_ACTIVE: docker
+      AWS_ACCESS_KEY_ID: test-key
+      AWS_SECRET_ACCESS_KEY: test-secret
+      AWS_REGION: us-east-1
+    networks:
+      - dndms_network
+
 volumes:
   redis_data: # Define el volumen para persistencia de Redis
   dynamodb_data: # Define el volumen para persistencia de DynamoDB
