@@ -17,3 +17,6 @@ buildNumber.properties
 
 #VSCODE
 .vscode/
+
+#carpeta docker
+/docker

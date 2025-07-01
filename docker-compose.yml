@@ -78,11 +78,15 @@ services:
       - dndms_network
 
   dynamo-local:
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
     image: amazon/dynamodb-local:2.4.0
     container_name: dynamo-local
     ports:
       - "8000:8000"
-    command: "-jar DynamoDBLocal.jar -sharedDb"          
+    volumes:
+      - "./docker/dynamodb:/home/dynamodblocal/data"
+      #- dynamodb_data:/home/dynamodblocal/data
+    working_dir: /home/dynamodblocal              
     networks:
       - dndms_network
 
@@ -164,9 +168,9 @@ services:
     environment:
       # Activamos el perfil 'docker' para que cargue 'application-docker.properties'
       SPRING_PROFILES_ACTIVE: docker
-      AWS_ACCESS_KEY_ID: test-key
-      AWS_SECRET_ACCESS_KEY: test-secret
-      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: 'test'
+      AWS_SECRET_ACCESS_KEY: 'test'
+      AWS_REGION: 'us-east-1'
     networks:
       - dndms_network
 
